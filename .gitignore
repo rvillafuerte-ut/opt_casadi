@@ -1,0 +1,19 @@
+# Virtual Environment
+casadi/
+
+# VS Code
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
