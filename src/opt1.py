@@ -48,7 +48,7 @@ xref = ca.vertcat(ref_x, ref_y, ref_z)
 dt = 0.1
 
 Q_pos = 100
-R_ctrl = 0.1
+R_ctrl = 0.05
 L = R_ctrl * ca.dot(u, u) + Q_pos * ca.dot(x[0:3] - xref, x[0:3] - xref)
 
 ### CAMBIO 2: RK4 genérico llamando a f_dyn
@@ -83,6 +83,14 @@ for k in range(N):
     
     obj += L_step_k
 
+# Añadir costo terminal para mejorar tracking al final del horizonte
+Qf = 1e4
+t_final = N*dt
+ref_final = ca.vertcat(5 * ca.cos(t_final/2) - 5,
+                        5 * ca.sin(t_final/2),
+                        t_final/2)
+obj = obj + Qf * ca.dot(X[0:3, N] - ref_final, X[0:3, N] - ref_final)
+
 opti.minimize(obj)
 
 # --- 4. Restricciones Físicas ---
@@ -98,8 +106,7 @@ opti.subject_to(opti.bounded(u_min, U, u_max))
 # opti.subject_to(opti.bounded(-10, X[1, :], 10))
 
 # --- Resolver ---
-# --- Resolver ---
-opti.solver('ipopt', {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.max_iter': 2000})
+opti.solver('ipopt', {'ipopt.print_level': 3, 'print_time': 3, 'ipopt.max_iter': 2000})
 
 try:
     sol = opti.solve()
@@ -141,6 +148,32 @@ try:
     ax2.set_title('Entradas de Control')
     
     plt.tight_layout()
+    plt.show()
+    
+    # --- Error de seguimiento (norma del error posicional) ---
+    # Calculamos la diferencia entre la posición real y la referencia y su norma
+    err = np.linalg.norm(X_sol[0:3, :] - ref_vals, axis=0)
+
+    # Imprimir métricas útiles para diagnóstico
+    print(f"Max tracking error: {err.max():.3f} m at t={time[err.argmax()]:.2f}s")
+    print(f"Final tracking error: {err[-1]:.3f} m")
+
+    # Guardar datos para análisis adicional
+    np.save('tracking_error.npy', err)
+    np.save('trajectory.npy', X_sol)
+    np.save('reference.npy', ref_vals)
+    np.save('control.npy', U_sol)
+
+    # Guardar figura y mostrarla
+    plt.figure(figsize=(8, 3))
+    plt.plot(time, err, 'm-', linewidth=2, label='Tracking error ||x - x_ref||')
+    plt.xlabel('Tiempo (s)')
+    plt.ylabel('Error (m)')
+    plt.title('Error de seguimiento de posición')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig('tracking_error.png')
     plt.show()
 
 except Exception as e:
